@@ -1,0 +1,92 @@
+---
+title: "PEM LiDAR Downloads"
+author: "C Armour"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(sf)
+require(tidyverse)
+require(lidR)
+require(pbapply)
+require(future)
+require(parallel)
+
+```
+
+
+At least once every six months, the index of available LiDAR files should be re-downloaded from the portal. You can check to see if you need to update by reading and running the "need_update" function.
+
+
+```{r update, echo = FALSE}
+
+source("functions/need_update.R")
+
+need_update()
+
+rm(need_update)
+
+```
+
+If you need to update, the instructions to do this are as follows:
+  1. Navigate to LidarBC Map Grid
+  https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a
+  2. Select Open in ArcGIS Desktop -> Open in ArcGIS Pro
+  3. Double click item.pitemx file to open in ArcGIS
+  4. Download point cloud index layer eg Point Cloud Index  - 1:2,500 Grid
+  5. Use "Export Features" tool and save to the "shapefiles" folder using the following format "las_index_mmmYYYY.shp"
+  6. Run the following lines of code where you have entered in the correct shapefile path to the feature you exported
+  7. DELETE the gpkg of the OLD index, if applicable
+
+```{r get-las-index, include = FALSE}
+
+# index.path <- "shapefiles/las_index_mmmYYYY.shp"
+shp.path <- "shapefiles/las_index_mar2024.shp"
+
+source("functions/make_gpkg_index.R")
+
+make_gpkg_index(shp.path = shp.path)
+
+rm(make_gpkg_index); rm(shp.path)
+
+```
+
+Your data path should be where you would like all the outputs to be stored. In this same branch, your AOI should be stored as a gpkg or shp. The data path you set here will be used throughout all other scripts. It is assumed that this path is different to the automatic WD for the package.
+
+
+```{r setup-folder-structure, include = FALSE}
+
+data.path <- "D:/Kitimat_LiDAR/data/"
+
+source("functions/setup_folders.R")
+
+setup_folders(data.path = data.path)
+
+rm(setup_folders)
+
+```
+
+Next, read in the path to your AOI (your own folder) and the LAS index that we previously checked. The data.path should already be specified in the global environment but is named here as an argument for easier troubleshooting. The function is parallelized, so you can specify the number of cores you wish to use. The default is 6.
+
+```{r}
+
+aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
+
+index <- sf::st_read(list.files(pattern = ".gpkg"))
+
+cores = 6
+
+cl = 1
+
+query_lidarbc(aoi = aoi, index = index, data.path = data.path)
+```
+
+
+```{r setup_batch_files}
+
+
+
+```
+
