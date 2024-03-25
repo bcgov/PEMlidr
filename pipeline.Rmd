@@ -5,6 +5,8 @@ date: "`r Sys.Date()`"
 output: html_document
 editor_options: 
   chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include = FALSE, echo = FALSE}
@@ -20,7 +22,9 @@ list.files("functions", pattern = ".R$", full.names = T) %>% lapply(source)
 
 ```
 
-First, set up your data path. The data path you set here will be used throughout all other scripts. It is assumed that this path is different to the automatic WD for the package.
+First, set up your data path. The data path you set here will be used
+throughout all other scripts. It is assumed that this path is different
+to the automatic WD for the package.
 
 ```{r setup-folder-structure, include = FALSE}
 
@@ -30,18 +34,31 @@ setup_folders(data.path = data.path)
 
 ```
 
-At least once every six months, the index of available LiDAR files should be re-downloaded from the portal. The code chunk below will check the date of the most recent index and download a newer version if applicable and an ArcGIS license is available. It returns the file path of the relevant geopackage after this operation.
+At least once every six months, the index of available LiDAR files
+should be re-downloaded from the portal. The code chunk below will check
+the date of the most recent index and download a newer version if
+applicable and an ArcGIS license is available. It returns the file path
+of the relevant geopackage after this operation.
 
-If you need to update manually for some reason, the instructions to do this are as follows:
-1. Navigate to LidarBC Map Grid
-https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a
-2. Select Open in ArcGIS Desktop -> Open in ArcGIS Pro
-3. Double click item.pitemx file to open in ArcGIS
-4. Download point cloud index layer eg Point Cloud Index  - 1:2,500 Grid
-5. Use "Export Features" tool and save to the "las_index_files" folder using the following format "las_index_YYYY-MM-DD.shp"
-6. Read this shapefile in as your index. Optional: export as gpkg.
+If you need to update manually for some reason, the instructions to do
+this are as follows:
 
-You also need to read in the path to your AOI, which should be stored a folder called "AOI" as a gpkg or shp. 
+1.  Navigate to LidarBC Map Grid
+    <https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a>
+
+2.  Select Open in ArcGIS Desktop -\> Open in ArcGIS Pro
+
+3.   Double click item.pitemx file to open in ArcGIS
+
+4.  Download point cloud index layer eg Point Cloud Index - 1:2,500 Grid
+
+5.  Use "Export Features" tool and save to the "las_index_files" folder
+    using the following format "las_index_YYYY-MM-DD.shp"
+
+6.  Read this shapefile in as your index. Optional: export as gpkg.
+
+You also need to read in the path to your AOI, which should be stored a
+folder called "AOI" as a gpkg or shp.
 
 ```{r get-layers}
 
@@ -53,13 +70,20 @@ aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
 
 ```
 
-Next is the download of the tiles. The following chunk takes the table outputted from the "get-layers" chunk and parallelizes it for faster download. You can set the number of cores in the "cores" variable. The data.path should already be specified in the global environment but is named here as an argument for easier troubleshooting.
+Here, we query the lidar data. The data.path should already be specified
+in the global environment but is named here as an argument for easier
+troubleshooting. This function returns the index of tiles which are to
+be downloaded.
 
 ```{r query-tiles, echo = FALSE}
 
 aoi_index <- query_lidarbc(aoi = aoi, index = index, data.path = data.path)
 
 ```
+
+Next is the download of the tiles. The following chunk takes the table
+outputted from the "get-layers" chunk and parallelizes it for faster
+download. You can set the number of cores in the "cores" variable.
 
 ```{r download}
 
@@ -105,20 +129,23 @@ stopCluster(cl)
 print('Downloads completed for area of interest')
 ```
 
+This chunk will create batch files on your computer to pre-process the
+data and then create CHMs and DEMs. It takes the previously specified
+cores and data.path arguments. There is a resolution argument which you
+can specify in the CHM and DEM functions - the default is set to 1m, 5m,
+10m, and 20m for both.
 
 ```{r setup-batch-files}
 
-setup_preprocess(data.path = data.path)
-
+setup_preprocess(data.path = data.path, cores = cores)
 
 # chm.res = c(1, 3, 5, 7, 9)
 
-setup_CHM(data.path = data.path, cores = 12)
+setup_CHM(data.path = data.path, cores = cores)
 
 
 # dem.res = c(1, 3, 5, 7, 9)
 
-setup_DEM(data.path = data.path, cores = 12)
+setup_DEM(data.path = data.path, cores = cores)
 
 ```
-
