@@ -12,7 +12,7 @@ make_gpkg_index <- function(){
       arc.open("https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/LiDAR_BC_S3_Public/FeatureServer/4") %>%
         arc.select() %>%
         arc.data2sp() %>%
-        st_write(., dsn = new.gpkg, append = FALSE)
+        st_write(., dsn = gpkg.path, append = FALSE)
       
       return(gpkg.path)
       
