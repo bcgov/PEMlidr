@@ -3,90 +3,122 @@ title: "PEM LiDAR Downloads"
 author: "C Armour"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE, echo = FALSE}
 
 library(sf)
 require(tidyverse)
-require(lidR)
 require(pbapply)
 require(future)
 require(parallel)
+require(arcgisbinding)
+
+list.files("functions", pattern = ".R$", full.names = T) %>% lapply(source)
 
 ```
 
-
-At least once every six months, the index of available LiDAR files should be re-downloaded from the portal. You can check to see if you need to update by reading and running the "need_update" function.
-
-
-```{r update, echo = FALSE}
-
-source("functions/need_update.R")
-
-need_update()
-
-rm(need_update)
-
-```
-
-If you need to update, the instructions to do this are as follows:
-  1. Navigate to LidarBC Map Grid
-  https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a
-  2. Select Open in ArcGIS Desktop -> Open in ArcGIS Pro
-  3. Double click item.pitemx file to open in ArcGIS
-  4. Download point cloud index layer eg Point Cloud Index  - 1:2,500 Grid
-  5. Use "Export Features" tool and save to the "shapefiles" folder using the following format "las_index_mmmYYYY.shp"
-  6. Run the following lines of code where you have entered in the correct shapefile path to the feature you exported
-  7. DELETE the gpkg of the OLD index, if applicable
-
-```{r get-las-index, include = FALSE}
-
-# index.path <- "shapefiles/las_index_mmmYYYY.shp"
-shp.path <- "shapefiles/las_index_mar2024.shp"
-
-source("functions/make_gpkg_index.R")
-
-make_gpkg_index(shp.path = shp.path)
-
-rm(make_gpkg_index); rm(shp.path)
-
-```
-
-Your data path should be where you would like all the outputs to be stored. In this same branch, your AOI should be stored as a gpkg or shp. The data path you set here will be used throughout all other scripts. It is assumed that this path is different to the automatic WD for the package.
-
+First, set up your data path. The data path you set here will be used throughout all other scripts. It is assumed that this path is different to the automatic WD for the package.
 
 ```{r setup-folder-structure, include = FALSE}
 
 data.path <- "D:/Kitimat_LiDAR/data/"
 
-source("functions/setup_folders.R")
-
 setup_folders(data.path = data.path)
-
-rm(setup_folders)
 
 ```
 
-Next, read in the path to your AOI (your own folder) and the LAS index that we previously checked. The data.path should already be specified in the global environment but is named here as an argument for easier troubleshooting. The function is parallelized, so you can specify the number of cores you wish to use. The default is 6.
+At least once every six months, the index of available LiDAR files should be re-downloaded from the portal. The code chunk below will check the date of the most recent index and download a newer version if applicable and an ArcGIS license is available. It returns the file path of the relevant geopackage after this operation.
 
-```{r}
+If you need to update manually for some reason, the instructions to do this are as follows:
+1. Navigate to LidarBC Map Grid
+https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a
+2. Select Open in ArcGIS Desktop -> Open in ArcGIS Pro
+3. Double click item.pitemx file to open in ArcGIS
+4. Download point cloud index layer eg Point Cloud Index  - 1:2,500 Grid
+5. Use "Export Features" tool and save to the "las_index_files" folder using the following format "las_index_YYYY-MM-DD.shp"
+6. Read this shapefile in as your index. Optional: export as gpkg.
 
+You also need to read in the path to your AOI, which should be stored a folder called "AOI" as a gpkg or shp. 
+
+```{r get-layers}
+
+## Pull the AOI index
+index <- make_gpkg_index() %>% st_read()
+
+# Double check that the AOI is read in correctly as a single file
 aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
 
-index <- sf::st_read(list.files(pattern = ".gpkg"))
+```
+
+Next is the download of the tiles. The following chunk takes the table outputted from the "get-layers" chunk and parallelizes it for faster download. You can set the number of cores in the "cores" variable. The data.path should already be specified in the global environment but is named here as an argument for easier troubleshooting.
+
+```{r query-tiles, echo = FALSE}
+
+aoi_index <- query_lidarbc(aoi = aoi, index = index, data.path = data.path)
+
+```
+
+```{r download}
 
 cores = 6
 
-cl = 1
+options(timeout=600)
 
-query_lidarbc(aoi = aoi, index = index, data.path = data.path)
+# Make a cluster with a number of cores, closing previous cores if needed
+cl = makeCluster(cores)
+# Load in required packages
+clusterEvalQ(cl, {library(tidyverse); library(sf)})
+# Export variables from global environment into each cluster
+clusterExport(cl, c("aoi_index", "data.path"))
+
+pblapply(
+  aoi_index$task.no,
+  cl = cl,
+  FUN = function(j){
+    
+    tictoc::tic()
+    # Get tile of interest
+    tile <- filter(aoi_index, task.no == j)
+    # Get URLs
+    tile_url <- tile$s3Url
+    rpt_url <- tile$acc_rpt_ur
+    # Download las tile
+    file_dest <- file.path(str_c(data.path,  'las/'), basename(tile_url))
+    try(download.file(tile_url, file_dest, mode = 'wb'), silent = TRUE)
+    # Download tile accuracy report
+    if(is.character(rpt_url)){
+      file_dest <- file.path(str_c(data.path,  'report/'), basename(rpt_url))
+      try(download.file(rpt_url, file_dest, mode = 'wb'), silent = TRUE)
+    }
+    tictoc::toc()
+    # Wait 30 seconds between downloads to avoid time out
+    Sys.sleep(30)
+    
+  })
+
+# Stop cluster
+stopCluster(cl)
+
+print('Downloads completed for area of interest')
 ```
 
 
-```{r setup_batch_files}
+```{r setup-batch-files}
+
+setup_preprocess(data.path = data.path)
 
 
+# chm.res = c(1, 3, 5, 7, 9)
+
+setup_CHM(data.path = data.path, cores = 12)
+
+
+# dem.res = c(1, 3, 5, 7, 9)
+
+setup_DEM(data.path = data.path, cores = 12)
 
 ```
 
