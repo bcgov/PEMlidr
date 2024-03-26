@@ -9,7 +9,7 @@ editor_options:
     wrap: 72
 ---
 
-```{r setup, include = FALSE, echo = FALSE}
+```{r setup, include = FALSE}
 
 library(sf)
 require(tidyverse)
@@ -26,11 +26,17 @@ First, set up your data path. The data path you set here will be used
 throughout all other scripts. It is assumed that this path is different
 to the automatic WD for the package.
 
+You also need to read in the path to your AOI, which should be stored in
+a folder called "`AOI`" as a `.gpkg` or `.shp`.
+
 ```{r setup-folder-structure, include = FALSE}
 
 data.path <- "D:/Kitimat_LiDAR/data/"
 
 setup_folders(data.path = data.path)
+
+# Double check that the AOI is read in correctly as a single file
+aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
 
 ```
 
@@ -46,34 +52,33 @@ this are as follows:
 1.  Navigate to LidarBC Map Grid
     <https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a>
 
-2.  Select Open in ArcGIS Desktop -\> Open in ArcGIS Pro
+2.  Select `Open in ArcGIS Desktop` -\> `Open in ArcGIS Pro`
 
-3.   Double click item.pitemx file to open in ArcGIS
+3.   Double click `item.pitemx` file to open in ArcGIS. This is also
+    stored in the `las_index_files` folder.
 
-4.  Download point cloud index layer eg Point Cloud Index - 1:2,500 Grid
+4.  Download point cloud index layer (eg
+    `Point Cloud Index - 1:2,500 Grid`)
 
-5.  Use "Export Features" tool and save to the "las_index_files" folder
-    using the following format "las_index_YYYY-MM-DD.shp"
+5.  Use "`Export Features`" tool and save to the `las_index_files`
+    folder using the following format: "`las_index_YYYY-MM-DD.shp`"
 
-6.  Read this shapefile in as your index. Optional: export as gpkg.
-
-You also need to read in the path to your AOI, which should be stored a
-folder called "AOI" as a gpkg or shp.
+6.  Read this shapefile in as your index. Optional: export as `.gpkg`.
 
 ```{r get-layers}
 
 ## Pull the AOI index
 index <- make_gpkg_index() %>% st_read()
 
-# Double check that the AOI is read in correctly as a single file
-aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
-
 ```
 
-Here, we query the lidar data. The data.path should already be specified
-in the global environment but is named here as an argument for easier
-troubleshooting. This function returns the index of tiles which are to
-be downloaded.
+Here, we query the LiDAR data to create an index of tiles to be
+downloaded. The `data.path` should already be specified in the global
+environment but is named here as an argument for easier troubleshooting.
+This function returns a standard dataframe. You can use the
+`keep.geometry = TRUE` argument to retain the spatial features of the
+tile index. This is useful if you want to view the tile coverage, but it
+is dropped by default as it slows the download process.
 
 ```{r query-tiles, echo = FALSE}
 
@@ -82,12 +87,12 @@ aoi_index <- query_lidarbc(aoi = aoi, index = index, data.path = data.path)
 ```
 
 Next is the download of the tiles. The following chunk takes the table
-outputted from the "get-layers" chunk and parallelizes it for faster
-download. You can set the number of cores in the "cores" variable.
+outputted from the `get-layers` chunk and parallelizes it for faster
+download. You can set the number of cores in the `cores` variable.
 
 ```{r download}
 
-cores = 6
+cores = 12
 
 options(timeout=600)
 
@@ -131,21 +136,21 @@ print('Downloads completed for area of interest')
 
 This chunk will create batch files on your computer to pre-process the
 data and then create CHMs and DEMs. It takes the previously specified
-cores and data.path arguments. There is a resolution argument which you
-can specify in the CHM and DEM functions - the default is set to 1m, 5m,
-10m, and 20m for both.
+`cores` and `data.path` arguments. There is a resolution argument
+(`res`) which you can specify in the `setup_CHM` and `setup_DEM`
+functions - the default is set to 1m, 5m, 10m, and 20m for both.
 
-```{r setup-batch-files}
+```{r processing-batch-files}
 
-setup_preprocess(data.path = data.path, cores = cores)
+preprocess.bat <- setup_preprocess(data.path = data.path, cores = cores)
+# shell.exec(preprocess.bat)
 
-# chm.res = c(1, 3, 5, 7, 9)
+chm.bat <- setup_CHM(data.path = data.path, cores = cores)
+# shell.exec(chm.bat)
 
-setup_CHM(data.path = data.path, cores = cores)
+dem.bat <- setup_DEM(data.path = data.path, cores = cores)
+# shell.exec(dem.bat)
 
-
-# dem.res = c(1, 3, 5, 7, 9)
-
-setup_DEM(data.path = data.path, cores = cores)
-
+metrics.bat <- setup_metrics(data.path = data.path, cores = cores)
+shell.exec(metrics.bat)
 ```

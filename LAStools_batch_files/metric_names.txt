@@ -1,0 +1,14 @@
+p10
+p25
+p50
+p75
+p90
+p99
+all
+abv
+avg
+qav
+std
+cov
+kur
+ske

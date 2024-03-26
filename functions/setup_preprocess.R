@@ -35,11 +35,12 @@ setup_preprocess <- function(data.path,
   lines <- rbind(init.lines, convert.lines, retile.lines, norm.lines, sep = "\n")
   
   
-  write.table(lines, str_c(data.path, "preprocessing.bat"),
+  write.table(lines, str_c(data.path, "LAStools_batch_files/preprocessing.bat"),
               quote = F,
               col.names = F,
               row.names = F,
               append = F)
   
-  return(str_c("Preprocess batch file written to ", str_c(data.path, "preprocessing.bat")))
+  print("Preprocess batch file complete.")
+  return(str_c(data.path, "LAStools_batch_files/preprocessing.bat"))
 }

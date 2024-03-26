@@ -4,7 +4,7 @@
 #
 # ------------------------------------------------------------------------------
 
-query_lidarbc <- function(aoi, index, data.path){
+query_lidarbc <- function(aoi, index, data.path, keep.geometry = FALSE){
   
   # Does AOI CRS match LidarBC Index?
   if(sf::st_crs(aoi) != sf::st_crs(index)){
@@ -13,7 +13,12 @@ query_lidarbc <- function(aoi, index, data.path){
   }
   
   # Extract intersecting polygons of aoi and LidarBC index
-  aoi_index <- sf::st_intersection(index, aoi) %>% st_drop_geometry()
+  if(keep.geometry == TRUE){
+    aoi_index <- sf::st_intersection(index, aoi)
+  } else {
+    aoi_index <- sf::st_intersection(index, aoi) %>% st_drop_geometry()
+  }
+  
   
   # Create directories for downloading if they do not exist
   

@@ -2,6 +2,7 @@
 setup_folders <- function(data.path){
   
   path <- c(data.path,
+            str_c(data.path, "LAStools_batch_files"),
             str_c(data.path, "las/"),
             str_c(data.path, "las/", "00_converted/"),
             str_c(data.path, "las/", "01_retiled/"),
@@ -20,5 +21,6 @@ setup_folders <- function(data.path){
     }
   }
   
+  print("Setup of folders completed.")
 }
 
