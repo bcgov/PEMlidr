@@ -11,32 +11,46 @@ editor_options:
 
 ```{r setup, include = FALSE}
 
-library(sf)
+require(sf)
 require(tidyverse)
 require(pbapply)
 require(future)
 require(parallel)
 require(arcgisbinding)
+require(lidR)
+require(future)
+require(terra)
+require(magrittr)
 
-list.files("functions", pattern = ".R$", full.names = T) %>% lapply(source)
+terra::terraOptions(overwrite = T, todisk = T, tempdir = "E:/temp")
 
+## Write simple function to source all other functions so we can refresh with a simple function call
+source_functions <- function(){
+  list.files(str_c(getwd(), "/functions"), pattern = ".R$", full.names = T) %>% lapply(source)
+}
+
+source_functions()
 ```
 
-First, set up your data path. The data path you set here will be used
-throughout all other scripts. It is assumed that this path is different
-to the automatic WD for the package.
+First, set up your working folder on drive/server that contains at least 100GB - i.e., NOT the working directory for the package. For example, our working folder is named `D:/Kitimat_LiDAR/`. The `setup_folders` function will take care of the rest.
 
-You also need to read in the path to your AOI, which should be stored in
-a folder called "`AOI`" as a `.gpkg` or `.shp`.
+The `data` folder in the top branch will contain all your downloaded ALS data and derivatives. The `data.path` variable is read into nearly everything - the functions will yell at you if it is not there.
+
+The `AOI` folder in the top branch will need to contain your area of interest, so dump it in there. If your AOI is a KMZ, you can use the function `kmz_to_gpkg` to unzip, convert to a geopackage, and write it to the `AOI` folder, returning the geopackage path. This function also automatically transforms the KMZ file GCS from latitude/longitude to EPSG:3005 (NAD 83 / BC Albers).
 
 ```{r setup-folder-structure, include = FALSE}
 
-data.path <- "D:/Kitimat_LiDAR/data/"
+data.path <- str_c("D:/Kitimat_LiDAR/data_test/")
+aoi.path <- str_replace(data.path, pattern = "data_test", replacement = "AOI")
+setup_folders(data.path)
 
-setup_folders(data.path = data.path)
+## Use for KMZ - read your KMZ file path in
+# kmz.path <- "D:/Kitimat_LiDAR/AOI/Kitamat PEM AOI - general.kmz"
+# kmz_to_gpkg(aoi.path, kmz.path = kmz.path) %>% sf::st_read()
+# rm(kmz.path)
 
-# Double check that the AOI is read in correctly as a single file
-aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/Kitimat_PEM_AOI.shp")
+## Already have a geopackage or shapefile? Dump it in your AOI folder and put the path here
+aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/AOI.gpkg")
 
 ```
 
@@ -51,18 +65,13 @@ this are as follows:
 
 1.  Navigate to LidarBC Map Grid
     <https://governmentofbc.maps.arcgis.com/home/item.html?id=5f6a1f31212a4cb2826743d2e52ef02a>
-
 2.  Select `Open in ArcGIS Desktop` -\> `Open in ArcGIS Pro`
-
 3.   Double click `item.pitemx` file to open in ArcGIS. This is also
     stored in the `las_index_files` folder.
-
 4.  Download point cloud index layer (eg
     `Point Cloud Index - 1:2,500 Grid`)
-
 5.  Use "`Export Features`" tool and save to the `las_index_files`
     folder using the following format: "`las_index_YYYY-MM-DD.shp`"
-
 6.  Read this shapefile in as your index. Optional: export as `.gpkg`.
 
 ```{r get-layers}
@@ -78,79 +87,30 @@ environment but is named here as an argument for easier troubleshooting.
 This function returns a standard dataframe. You can use the
 `keep.geometry = TRUE` argument to retain the spatial features of the
 tile index. This is useful if you want to view the tile coverage, but it
-is dropped by default as it slows the download process.
+is dropped by default as it slows the download process. For similar purposes, you can choose to keep index tiles that are already downloaded using the keep.existing argument
 
 ```{r query-tiles, echo = FALSE}
 
-aoi_index <- query_lidarbc(aoi = aoi, index = index, data.path = data.path)
+aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.existing = FALSE)
 
 ```
 
 Next is the download of the tiles. The following chunk takes the table
 outputted from the `get-layers` chunk and parallelizes it for faster
-download. You can set the number of cores in the `cores` variable.
+download. You can set the number of cores in the `cores` variable, which defaults to 6.
+
+After the tiles are downloaded, they need to be checked to ensure they coordinate systems are consistent. This is done using the LAScatalog engine in the `lidR` package, and depending on the number of downloaded tiles, typically takes hours to days to complete. A progress bar will appear with this function giving you the approximate time.
 
 ```{r download}
 
-cores = 12
+download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 6L)
 
-options(timeout=600)
+retile_lidarbc(data.path = data.path, cores = 6L)
+normalize_lidarbc(data.path = data.path, cores = 6L)
 
-# Make a cluster with a number of cores, closing previous cores if needed
-cl = makeCluster(cores)
-# Load in required packages
-clusterEvalQ(cl, {library(tidyverse); library(sf)})
-# Export variables from global environment into each cluster
-clusterExport(cl, c("aoi_index", "data.path"))
+create_DEM(data.path = data.path, output.res = c(5, 10, 20), cores = 6L)
 
-pblapply(
-  aoi_index$task.no,
-  cl = cl,
-  FUN = function(j){
-    
-    tictoc::tic()
-    # Get tile of interest
-    tile <- filter(aoi_index, task.no == j)
-    # Get URLs
-    tile_url <- tile$s3Url
-    rpt_url <- tile$acc_rpt_ur
-    # Download las tile
-    file_dest <- file.path(str_c(data.path,  'las/'), basename(tile_url))
-    try(download.file(tile_url, file_dest, mode = 'wb'), silent = TRUE)
-    # Download tile accuracy report
-    if(is.character(rpt_url)){
-      file_dest <- file.path(str_c(data.path,  'report/'), basename(rpt_url))
-      try(download.file(rpt_url, file_dest, mode = 'wb'), silent = TRUE)
-    }
-    tictoc::toc()
-    # Wait 30 seconds between downloads to avoid time out
-    Sys.sleep(30)
-    
-  })
-
-# Stop cluster
-stopCluster(cl)
-
-print('Downloads completed for area of interest')
 ```
 
-This chunk will create batch files on your computer to pre-process the
-data and then create CHMs and DEMs. It takes the previously specified
-`cores` and `data.path` arguments. There is a resolution argument
-(`res`) which you can specify in the `setup_CHM` and `setup_DEM`
-functions - the default is set to 1m, 5m, 10m, and 20m for both.
 
-```{r processing-batch-files}
 
-preprocess.bat <- setup_preprocess(data.path = data.path, cores = cores)
-# shell.exec(preprocess.bat)
-
-chm.bat <- setup_CHM(data.path = data.path, cores = cores)
-# shell.exec(chm.bat)
-
-dem.bat <- setup_DEM(data.path = data.path, cores = cores)
-# shell.exec(dem.bat)
-
-metrics.bat <- setup_metrics(data.path = data.path, cores = cores)
-shell.exec(metrics.bat)
-```

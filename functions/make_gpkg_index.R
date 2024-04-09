@@ -11,10 +11,13 @@ make_gpkg_index <- function(){
       
       gpkg.path <- str_c("las_index_files/las_index_", Sys.Date(), ".gpkg")
       
-      arc.open("https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/LiDAR_BC_S3_Public/FeatureServer/4") %>%
+      ind <- arc.open("https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/LiDAR_BC_S3_Public/FeatureServer/4") %>%
         arc.select() %>%
         arc.data2sp() %>%
-        st_write(., dsn = gpkg.path, append = FALSE)
+        st_as_sf()
+        # st_transform(crs = 3005)
+        
+        st_write(ind, dsn = gpkg.path, append = FALSE)
       
       return(gpkg.path)
       print("Index updated.")
