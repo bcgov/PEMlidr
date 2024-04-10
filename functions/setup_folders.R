@@ -2,8 +2,7 @@
 setup_folders <- function(data.path){
   
   path <- c(str_c(data.path, "las/"),
-            str_c(data.path, "las/", "01_retiled/"),
-            str_c(data.path, "las/", "02_norm/"),
+            str_c(data.path, "las/", "normalized/"),
             str_c(data.path, "chm/"),
             str_c(data.path, "chm/", "by_tile/"),
             str_c(data.path, "dem/"),

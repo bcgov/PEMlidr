@@ -44,6 +44,8 @@ download_lidarbc <- function(aoi.index, data.path, cores = 6L){
   # Stop cluster
   stopCluster(cl)
   
-  print('Downloads completed for area of interest')
+  list.files(str_c(data.path, "las/"), pattern = ".laz$", full.names = T) %>% readLAScatalog() %>% lidR:::catalog_laxindex()
   
-} 
+  print('Downloads completed for area of interest')
+
+}

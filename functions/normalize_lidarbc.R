@@ -1,33 +1,63 @@
-normalize_lidarbc <- function(data.path, cores = 6L){
+normalize_lidarbc <- function(data.path, cores = 6L, keep.existing = FALSE){
+  
+  data.path = data.path
   
   ## Read new catalog for troubleshooting
-  ctg_retiled <- list.files(str_c(data.path, "las/01_retiled"), pattern = ".laz$", full.names = T) %>%
-    readLAScatalog()
+  las.index <- list.files(str_c(data.path, "las/"), pattern = ".laz$", full.names = T) %>%
+    tibble(filename = .) %>%
+    mutate(file.dest = str_replace(filename, pattern = "las/", replacement = "las/normalized/"))
   
-  ## Set options for new catalog
-  opt_chunk_buffer(ctg_retiled) <- 30
-  opt_chunk_size(ctg_retiled) <- 0 # Maintain tile size as they were retiled before
-  opt_laz_compression(ctg_retiled) <- TRUE
-  opt_output_files(ctg_retiled) <- str_c(data.path, "las/02_norm/{ORIGINALFILENAME}")
-  opt_stop_early(ctg_retiled) <- FALSE
+  # Check if some tiles are already downloaded?
+  # If they are, remove them from the area of interest index
   
-  ctg_retiled@data %<>% mutate(file.check = file.exists(str_replace(filename, pattern = "01_retiled", replacement = "02_norm"))) %>%
-    filter(file.check == F)
+  if(keep.existing == FALSE){
+    las.index <- las.index[which(!las.index$file.dest %in% list.files(str_c(data.path,  'las/normalized/'), full.names = T)),] %>%
+      mutate(task.no = row_number()) %>%
+      relocate(task.no, .before = 1)
+  } else {
+    las.index <- las.index %>%
+      mutate(task.no = row_number()) %>%
+      relocate(task.no, .before = 1)
+  }
   
-  ## Start future cores
-  plan(multisession, workers = cores)
-  set_lidr_threads(cores)
+  # Make a cluster with a number of cores, closing previous cores if needed
+  if(exists("cl")){stopCluster(cl); rm(cl)}
+  cl = makeCluster(cores)
+  # Load in required packages
+  clusterEvalQ(cl, {library(tidyverse); library(sf); library(lidR)})
+  # Export variables from global environment into each cluster
+  clusterExport(cl, c("las.index", "data.path"))
   
-  ctg_normalized <-  catalog_apply(ctg_retiled, .options = options, function(chunk){
-    las <- readLAS(chunk)
-    if (lidR::is.empty(las)) return(NULL)
-    las_norm <- normalize_height(las, tin())
-    las_norm@data <- las_norm@data %>% filter(Z >= 0 & Z < 100) ## Filter again for high outliers
-    return(las_norm)})
+  pblapply(
+    las.index$task.no,
+    cl = cl,
+    FUN = function(j){
+      
+      tictoc::tic()
+      
+      # Get tile of interest
+      tile <- filter(las.index, task.no == j)
+      
+      # Read LAS file and skip if empty, then filter
+      las <- readLAS(tile$filename)
+      if (lidR::is.empty(las)) return(NULL)
+      las@data <- las@data %>%
+        filter(Classification != 7) %>%
+        filter(Z >= 0)
+      
+      # Normalize height
+      normalize_height(las, tin()) %>%
+        writeLAS(., tile$file.dest, index = TRUE)
+      
+      tictoc::toc()
+      # Wait 30 seconds between downloads to avoid time out
+      Sys.sleep(30)
+      
+    })
   
-  ## End future cores
-  plan(sequential) 
+  # Stop cluster
+  stopCluster(cl)
   
-  ## Index files
-  lidR:::catalog_laxindex(ctg_normalized)
+  print('Normalized tiles completed')
+
 }

@@ -40,7 +40,7 @@ The `AOI` folder in the top branch will need to contain your area of interest, s
 
 ```{r setup-folder-structure, include = FALSE}
 
-data.path <- str_c("D:/Kitimat_LiDAR/data_test/")
+data.path <- str_c("D:/Boundary_LiDAR/data/")
 aoi.path <- str_replace(data.path, pattern = "data_test", replacement = "AOI")
 setup_folders(data.path)
 
@@ -50,7 +50,7 @@ setup_folders(data.path)
 # rm(kmz.path)
 
 ## Already have a geopackage or shapefile? Dump it in your AOI folder and put the path here
-aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/AOI.gpkg")
+aoi <- sf::st_read("D:/Boundary_LiDAR/AOI/BDY_R_AOI.shp")
 
 ```
 
@@ -79,36 +79,28 @@ this are as follows:
 ## Pull the AOI index
 index <- make_gpkg_index() %>% st_read()
 
-```
-
-Here, we query the LiDAR data to create an index of tiles to be
-downloaded. The `data.path` should already be specified in the global
-environment but is named here as an argument for easier troubleshooting.
-This function returns a standard dataframe. You can use the
-`keep.geometry = TRUE` argument to retain the spatial features of the
-tile index. This is useful if you want to view the tile coverage, but it
-is dropped by default as it slows the download process. For similar purposes, you can choose to keep index tiles that are already downloaded using the keep.existing argument
-
-```{r query-tiles, echo = FALSE}
-
-aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.existing = FALSE)
+# st_write(index, dsn = "C:/Users/ccarmour.stu/Documents/GitHub/PEMlidr/las_index_files/shapefiles/las_index_2024-04-09.shp", append = F)
 
 ```
 
-Next is the download of the tiles. The following chunk takes the table
-outputted from the `get-layers` chunk and parallelizes it for faster
-download. You can set the number of cores in the `cores` variable, which defaults to 6.
+Here, we query the LiDAR data to create an index of tiles to be downloaded. The `data.path` should already be specified in the global
+environment but is named here as an argument for easier troubleshooting. This function returns a standard dataframe. You can use the `keep.geometry = TRUE` argument to retain the spatial features of the tile index. This is useful if you want to view the tile coverage, but it is dropped by default as it slows the download process. For similar purposes, you can choose to keep index tiles that are already downloaded using the `keep.existing` argument.
 
-After the tiles are downloaded, they need to be checked to ensure they coordinate systems are consistent. This is done using the LAScatalog engine in the `lidR` package, and depending on the number of downloaded tiles, typically takes hours to days to complete. A progress bar will appear with this function giving you the approximate time.
+Next is the download of the tiles. The following chunk takes the output AOI table and parallelizes it for faster download. You can set the number of cores in the `cores` variable, which defaults to 6. Ddepending on the number of downloaded tiles, this typically takes hours to days to complete.
 
 ```{r download}
 
-download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 6L)
+aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.existing = FALSE)
 
-retile_lidarbc(data.path = data.path, cores = 6L)
-normalize_lidarbc(data.path = data.path, cores = 6L)
+download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 12L)
 
-create_DEM(data.path = data.path, output.res = c(5, 10, 20), cores = 6L)
+normalize_lidarbc(data.path = data.path, cores = 12L)
+
+create_DEM(data.path = data.path, cores = 6L)
+merge_DEM()
+
+create_CHM()
+merge_CHM()
 
 ```
 
