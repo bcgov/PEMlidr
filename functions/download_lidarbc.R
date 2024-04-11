@@ -12,7 +12,7 @@ download_lidarbc <- function(aoi.index, data.path, cores = 6L){
   # Make a cluster with a number of cores, closing previous cores if needed
   cl = makeCluster(cores)
   # Load in required packages
-  clusterEvalQ(cl, {library(tidyverse); library(sf)})
+  clusterEvalQ(cl, {library(tidyverse); library(sf); library(lidR)})
   # Export variables from global environment into each cluster
   clusterExport(cl, c("aoi.index", "data.path"))
   
@@ -24,12 +24,32 @@ download_lidarbc <- function(aoi.index, data.path, cores = 6L){
       tictoc::tic()
       # Get tile of interest
       tile <- filter(aoi.index, task.no == j)
+      
       # Get URLs
       tile_url <- tile$s3Url
       rpt_url <- tile$acc_rpt_ur
+      
       # Download las tile
-      file_dest <- file.path(str_c(data.path,  'las/'), basename(tile_url))
+      file_dest <- file.path(str_c(data.path,  'las'), basename(tile_url))
       try(download.file(tile_url, file_dest, mode = 'wb'), silent = TRUE)
+      
+      # Check projection and fix
+      if(file.exists(file_dest)){
+        las.ctg <- readLAScatalog(file_dest)
+        opt_independent_files(las.ctg) <- T
+        opt_laz_compression(las.ctg) <- T
+        opt_output_files(las.ctg) <- tools::file_path_sans_ext(file_dest)
+        
+        if(st_crs(las.ctg) != st_crs(tile$epsg)){
+          catalog_apply(las.ctg, function(chunk){
+            las <- readLAS(chunk)
+            if (lidR::is.empty(las)) return(NULL)
+            st_crs(las) = st_crs(tile$epsg)
+            return(las)
+          })
+        }
+      }
+      
       # Download tile accuracy report
       if(is.character(rpt_url)){
         file_dest <- file.path(str_c(data.path,  'report/'), basename(rpt_url))

@@ -25,15 +25,8 @@ query_lidarbc <- function(aoi, index, data.path, keep.geometry = FALSE, keep.exi
   }
   
   
-  # Create directories for downloading if they do not exist
-  
-  if(!exists("data.path",  envir = environment())){
-    return(print("Did you define the data path?"))
-  }
-  
   # Check if some tiles are already downloaded?
   # If they are, remove them from the area of interest index
-  
   if(keep.existing == FALSE){
     aoi.index <- aoi.index[which(!aoi.index$filename %in% list.files(str_c(data.path,  'las/'))),] %>%
       mutate(task.no = row_number()) %>%
@@ -43,6 +36,11 @@ query_lidarbc <- function(aoi, index, data.path, keep.geometry = FALSE, keep.exi
       mutate(task.no = row_number()) %>%
       relocate(task.no, .before = 1)
   }
+  
+  # Pull projection table
+  aoi.index <- read.csv("projection_codes.csv", header = T) %>%
+    select(!URL) %>%
+    left_join(aoi.index, ., by = "projection", keep = F)
   
   print(str_c('There are ', 
                nrow(aoi.index), ' lidar point cloud tiles to be downloaded from LidarBC'))

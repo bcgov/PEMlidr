@@ -40,8 +40,8 @@ The `AOI` folder in the top branch will need to contain your area of interest, s
 
 ```{r setup-folder-structure, include = FALSE}
 
-data.path <- str_c("D:/Boundary_LiDAR/data/")
-aoi.path <- str_replace(data.path, pattern = "data_test", replacement = "AOI")
+data.path <- str_c("D:/Kitimat_LiDAR/data/")
+aoi.path <- str_replace(data.path, pattern = "data", replacement = "AOI")
 setup_folders(data.path)
 
 ## Use for KMZ - read your KMZ file path in
@@ -50,7 +50,7 @@ setup_folders(data.path)
 # rm(kmz.path)
 
 ## Already have a geopackage or shapefile? Dump it in your AOI folder and put the path here
-aoi <- sf::st_read("D:/Boundary_LiDAR/AOI/BDY_R_AOI.shp")
+aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/AOI.gpkg")
 
 ```
 
@@ -90,9 +90,9 @@ Next is the download of the tiles. The following chunk takes the output AOI tabl
 
 ```{r download}
 
-aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.existing = FALSE)
+aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.geometry = FALSE)
 
-download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 12L)
+download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 6L)
 
 normalize_lidarbc(data.path = data.path, cores = 12L)
 
