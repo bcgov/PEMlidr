@@ -1,4 +1,4 @@
-setup_metrics <- function(data.path, res = c(5, 10, 20), cores = 6){
+setup_metrics_file <- function(data.path, res = c(5, 10, 20), cores = 6){
   
   init.lines <- str_c("set f_dir=", data.path) %>%
     str_replace(pattern = "/$", replace = "") %>%

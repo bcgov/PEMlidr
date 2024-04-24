@@ -1,4 +1,4 @@
-setup_CHM <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
+setup_CHM_file <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
   
   ### Initialize lines with the working directory and desired number of cores
   init.lines <- str_c("set f_dir=", data.path) %>%
@@ -39,7 +39,7 @@ setup_CHM <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
               row.names = F,
               append = F)
   
-  print("CHM batch file complete.")
+  print("CHM batch file complete. Executing in CMD.")
   return(str_c(data.path, "LAStools_batch_files/surface_models_CHM.bat"))
   
 }

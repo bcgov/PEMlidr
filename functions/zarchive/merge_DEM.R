@@ -1,8 +1,6 @@
 merge_DEM <- function(data.path, output.res = c(5, 10, 20)){
   
-  if(!dir.exists(data.path)){
-    print("The current data path is not valid. Check folder setup.")
-    }
+  terra::terraOptions(overwrite = T, todisk = T, tempdir = "E:/temp")
   
   dem_tiles <- list.files(str_c(data.path, "dem/by_tile"), pattern = ".tif$", full.names = T)
   

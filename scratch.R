@@ -1,17 +1,3 @@
-require(lidR)
-
-
-t <- list.files("D:/Kitimat_LiDAR/data_test/las/", pattern = ".laz$", full.names = T) %>% readLAScatalog()
-t2 <- list.files("D:/Kitimat_LiDAR/data_test/las/01_retiled", pattern = ".laz$", full.names = T) %>% readLAScatalog()
-
-
-st_crs(t) <- st_crs(3005)
-
-st_write(t@data, dsn = "D:/Kitimat_LiDAR/data/ctg_orig.shp", append = F)
-
-las <- readLAS("D:/Kitimat_LiDAR/data/las/bc_103h055_4_1_4_xyes_17_utm09_20170806.laz")
-
-
 
 ### Filing a CHM
 
@@ -47,3 +33,58 @@ st_crs(las) <- 6652
 index %>% filter(filename == "bc_103h056_3_1_4_xyes_17_utm09_20170806.laz")
 
 "D:/Kitimat_LiDAR/data_test/las/bc_103i089_3_2_1_xyes_8_utm09_2021.laz"
+
+
+ctg_norm@data %<>% mutate(file.check = str_replace(filename, pattern = "las\\\\02_norm", replacement = "chm\\\\by_tile"),
+                          file.check = str_replace(file.check, pattern = ".laz", replacement = ".tif"),
+                          file.check = file.exists(file.check)) %>%
+  filter(file.check == F)
+
+
+t <- readLAS("D:/Kitimat_LiDAR/data/las/bc_103h097_1_2_4_xyes_8_utm09_2019.laz")
+n <- normalize_height(t, knnidw())
+
+las <- classify_ground(t, algorithm = pmf(ws = 5, th = 3))
+
+ctg.las <- readLAScatalog("D:/Kitimat_LiDAR/data/las/bc_103h097_1_2_4_xyes_8_utm09_2019.laz")
+
+
+ctg <- readLAScatalog(list.files("D:/Kitimat_LiDAR/data/las", pattern = ".laz", full.names = T))
+
+no.crs <- ctg@data %>% filter(CRS == 0)
+
+
+  t <- readLAS("D:\\Kitimat_LiDAR\\data\\las\\bc_103h056_3_2_4_xyes_17_utm09_20170806.laz")
+
+ctg.t <- readLAScatalog(readLAS("D:\\Kitimat_LiDAR\\data\\las\\bc_103h056_3_2_4_xyes_17_utm09_20170806.laz")
+)
+
+aoi.index <- list.files(data.path, pattern = "aoi_index", full.names = T) %>%
+  st_read() %>%
+  mutate(task.no = row_number()) %>%
+  relocate(task.no, .before = 1)
+
+
+las2 <- filter_duplicates(las)
+# las2@data <- las2@data %>% filter(Classification == 17 | Classification == 2)
+# plot(las2, color = "Classification", bg = "white")
+
+las2@data <- las2@data %>% filter(Classification != 1)
+
+# Reclass weird noise classes
+las2@data <- las2@data %>%
+  mutate(Class.new = case_when(Classification == 17 ~ 1,
+                               Classification == 5 ~ 1,
+                               TRUE ~ Classification))
+
+las3 <- classify_ground(las2, algorithm = pmf(ws = 5, th = 3))
+
+plot(las3, color = "Classification")
+
+las3@data <- las3@data %>% filter(Classification == 17)
+
+ws <- seq(3, 12, 3)
+th <- seq(0.1, 1.5, length.out = length(ws))
+las4 <- classify_ground(las2, algorithm = pmf(ws = ws, th = th))
+
+

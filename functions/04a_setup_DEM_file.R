@@ -1,4 +1,4 @@
-setup_DEM <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
+setup_DEM_file <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
   
   ### Initialize lines with the working directory and desired number of cores
   init.lines <- str_c("set f_dir=", data.path) %>%
@@ -40,7 +40,7 @@ setup_DEM <- function(data.path, res = c(1, 5, 10, 20), cores = 6){
               row.names = F,
               append = F)
   
-  print("DEM batch file complete.")
+  print("DEM batch file complete. Executing in CMD.")
   return(str_c(data.path, "LAStools_batch_files/surface_models_DEM.bat"))
   
 }

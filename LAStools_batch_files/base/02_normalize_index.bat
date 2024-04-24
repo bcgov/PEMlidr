@@ -1,6 +1,7 @@
 ::Normalize height
 lasheight -i %f_dir%\las\01_retiled\*.laz ^
 	-replace_z ^
+	-remain_buffered ^
 	-odir %f_dir%\las\02_norm ^
 	-olaz ^
 	-cores %cores%

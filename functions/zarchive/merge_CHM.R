@@ -1,8 +1,15 @@
 merge_CHM <- function(data.path, output.res = c(5, 10, 20)){
   
-  if(!dir.exists(data.path)){print("The current data path is not valid. Check folder setup.")}
+  terra::terraOptions(overwrite = T, todisk = T, tempdir = "E:/temp")
   
-  r_chm <- list.files(str_c(data.path, "chm/by_tile"), pattern = ".tif$", full.names = T) %>% vrt()
+  chm_tiles <- list.files(str_c(data.path, "chm/by_tile"), pattern = ".tif$", full.names = T)
+  
+  if(length(chm_tiles) > 1){
+    r_chm <- chm_tiles %>% vrt()
+  } else {
+    r_chm <- NA
+    return("No tiles to merge. Check folder.")
+  }
   
   for(i in 1:length(output.res)){
     if(as.integer(output.res[i]) > min(res(r_chm))){

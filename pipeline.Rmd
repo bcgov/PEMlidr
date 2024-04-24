@@ -41,7 +41,6 @@ The `AOI` folder in the top branch will need to contain your area of interest, s
 ```{r setup-folder-structure, include = FALSE}
 
 data.path <- str_c("D:/Kitimat_LiDAR/data/")
-aoi.path <- str_replace(data.path, pattern = "data", replacement = "AOI")
 setup_folders(data.path)
 
 ## Use for KMZ - read your KMZ file path in
@@ -50,7 +49,7 @@ setup_folders(data.path)
 # rm(kmz.path)
 
 ## Already have a geopackage or shapefile? Dump it in your AOI folder and put the path here
-aoi <- sf::st_read("D:/Kitimat_LiDAR/AOI/AOI.gpkg")
+aoi <- sf::st_read("D:/Baboon_LiDAR/AOI/aoi_snapped.gpkg")
 
 ```
 
@@ -88,21 +87,35 @@ environment but is named here as an argument for easier troubleshooting. This fu
 
 Next is the download of the tiles. The following chunk takes the output AOI table and parallelizes it for faster download. You can set the number of cores in the `cores` variable, which defaults to 6. Ddepending on the number of downloaded tiles, this typically takes hours to days to complete.
 
-```{r download}
+```{r query-download}
 
-aoi.index <- query_lidarbc(data.path = data.path, aoi = aoi, index = index, keep.geometry = FALSE)
+query_lidarbc(data.path = data.path, aoi = aoi, index = index)
 
-download_lidarbc(aoi.index = aoi.index, data.path = data.path, cores = 6L)
+download_lidarbc(data.path = data.path, cores = 6L)
 
-normalize_lidarbc(data.path = data.path, cores = 12L)
+```
 
-create_DEM(data.path = data.path, cores = 6L)
+
+```{r}
+
+setup_preprocess_file(data.path = data.path, cores = 12L) %>% shell.exec()
+setup_DEM_file(data.path = data.path, cores = 12L) %>% shell.exec()
+setup_CHM_file(data.path = data.path, cores = 12L) %>% shell.exec()
+
+
+```
+
+
+
+```{r}
+
+normalize_lidarbc(data.path = data.path, cores = 4L)
+
+create_DEM(data.path = data.path, cores = 4L)
 merge_DEM()
 
 create_CHM()
 merge_CHM()
 
 ```
-
-
 
