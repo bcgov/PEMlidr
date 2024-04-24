@@ -41,6 +41,16 @@ ctg_norm@data %<>% mutate(file.check = str_replace(filename, pattern = "las\\\\0
   filter(file.check == F)
 
 
+# if(!retile){
+#   
+#   retile.lines <- vector()
+#   
+#   fix.source.folder <- norm.lines %>%
+#     filter(str_detect(V1, "01_retiled")) %>%
+#     mutate(V1 = str_replace(V1, "\\\\01_retiled", ""))
+#   
+#   norm.lines[grepl("01_retiled", norm.lines$V1),] <- fix.source.folder
+# }
 t <- readLAS("D:/Kitimat_LiDAR/data/las/bc_103h097_1_2_4_xyes_8_utm09_2019.laz")
 n <- normalize_height(t, knnidw())
 
